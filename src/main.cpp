@@ -30,6 +30,9 @@
 
 using namespace Stockfish;
 
+
+
+
 int main(int argc, char* argv[]) {
 
   std::cout << engine_info() << std::endl;
@@ -45,6 +48,7 @@ int main(int argc, char* argv[]) {
   Threads.set(size_t(Options["Threads"]));
   Search::clear(); // After threads are up
   Eval::NNUE::init();
+
 
   UCI::loop(argc, argv);
 
