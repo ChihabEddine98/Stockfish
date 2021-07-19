@@ -26,7 +26,7 @@ namespace Stockfish {
         }
 
         // Do The Alpha Beta Search from a given position
-        Move AlphaBeta::search(Position& pos)
+        Move AlphaBeta::search(Position& pos,Depth depth)
         {
             return best_move(pos,depth);
         }

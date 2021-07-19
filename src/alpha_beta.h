@@ -15,8 +15,8 @@ namespace Stockfish {
     extern Depth depth;
 
     namespace AlphaBeta {
-        void init(Position& root,int depth);
-        Move search(Position& pos);
+        void init(Position& root,Depth depth);
+        Move search(Position& pos,Depth depth);
         Move best_move(Position& pos,Depth depth);
         Value negamax(Position& pos, Depth depth, int alpha, int beta, Color color);
 
