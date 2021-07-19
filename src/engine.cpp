@@ -15,6 +15,7 @@
 #include "uci.h"
 
 #include "engine.h"
+#include "alpha_beta.h"
 
 
 using namespace Stockfish;
@@ -47,13 +48,18 @@ void debug()
 
     pos.set(StartFEN, false,&states->back(),Threads.main());
 
-    std::cout << pos << std::endl;
+
     MoveList<LEGAL> moves = MoveList<LEGAL>(pos);
+    AlphaBeta::
+    std::cout << "Evaluation : " <<Eval::evaluate(pos) << std::endl;
+    std::cout << "----------------- \n" << std::endl;
+    std::cout << pos << std::endl;
 
 
     for (auto& m : moves) {
         sync_cout << UCI::move(m,false) << sync_endl;
         pos.do_move(m,st);
+        std::cout << "Evaluation : " <<Eval::evaluate(pos) << std::endl;
         std::cout << pos << std::endl;
         pos.undo_move(m);
 
