@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <map>
+#include <chrono>
 
 #include "bitboard.h"
 #include "endgame.h"
@@ -20,6 +21,7 @@
 
 
 using namespace Stockfish;
+using namespace std;
 
 
 
@@ -101,7 +103,8 @@ Move search(Position& pos,Depth depth)
 
 
 // This function is a utils function which wil help us
-// to get min or max of a hashmap structure given on parameter
+// to get argmin or argmax (a Move) (based on max_value bool )
+// from the hashmap structure given on parameter (v_map)
 
 Move get_arg_best_map(std::map<Move,Value> v_map , bool max_value)
 {
@@ -126,19 +129,90 @@ Move get_arg_best_map(std::map<Move,Value> v_map , bool max_value)
 // v_map : is the value function which takes an action as key
 //         and NNUE value as value
 std::map<Move, Value > v_map;
+// T : is the transposition table used to speed up the search
+//   : the position (state) is represanted with it fen()
+std::map<string,Value> T;
+
+
+// In this function we will return the argmax (best Move based
+// on value ) (for each player (WHITE) needs to maximize &
+// (BLACK) try to minimize the Value on the v_map HashMap)
 
 Move best_action(Position& pos)
 {
-    if (pos.side_to_move() == WHITE)
+    return pos.side_to_move() == WHITE ? get_arg_best_map(v_map,true) : get_arg_best_map(v_map, false);
+}
+
+// The unbounded minimax iteration which repeats until
+// the depth is exceeded or a terminal position is attained
+
+Value ub_minimax_iter(Position& pos,Depth depth)
+{
+    //depth end reached ? or we actually hit a win/lose condition?
+    if (depth == 0)
     {
+        return  pos.side_to_move() ? Eval::evaluate(pos) : -Eval::evaluate(pos);
+    }
+
+    // Get successors (possible actions from the actual Position)
+    MoveList<LEGAL> moves = MoveList<LEGAL>(pos);
+    StateInfo st;
+
+
+    // No possible moves - then it's a terminal state
+    if (moves.size() == 0)
+    {
+        return  pos.side_to_move() ? Eval::evaluate(pos) : -Eval::evaluate(pos);
+    }
+
+    const string pos_fen = pos.fen();
+    auto itr = T.find(pos_fen);
+
+    // If we don't have this position in T yet
+    if (itr == T.end() )
+    {
+        // Add This position to the T table
+        T[pos.fen()] = Eval::evaluate(pos);
+
+        for( auto& move : moves)
+        {
+            pos.do_move(move,st);
+            v_map[move] = Eval::evaluate(pos);
+            pos.undo_move(move);
+        }
 
     }
     else
     {
-
+        Move a_b = best_action(pos);
+        pos.do_move(a_b,st);
+        v_map[a_b] = ub_minimax_iter(pos,(Depth)depth-1);
     }
 
+    Move a_b = best_action(pos);
+
+    return v_map[a_b];
+
 }
+
+// The Unbounded Minimax function that repeat calling
+// unbounded_minimax_iteration while tho (elapsed time is on limits)
+// return the best action to take
+Move ub_minimax(Position& pos,Depth depth ,double tho)
+{
+    auto t_start = std::chrono::system_clock::now();
+
+    while(depth > 0)
+    {
+        auto t_iter = std::chrono::system_clock::now();
+        std::chrono::duration<double> delta = t_iter-t_start;
+        if (delta.count() <= tho) break;
+        Value value = ub_minimax_iter(pos,depth);
+    }
+
+    return best_action(pos);
+}
+
 
 void engine_init(int argc, char* argv[])
 {
@@ -203,7 +277,6 @@ int main(int argc, char* argv[])
 {
 
     engine_init(argc,argv);
-    std::map<Move ,Value> x;
 
     //debug();
 
@@ -224,23 +297,25 @@ int main(int argc, char* argv[])
     for (auto& m : moves) {
         sync_cout << UCI::move(m,false) << sync_endl;
         pos.do_move(m,st);
-        x[m] = Eval::evaluate(pos);
+        v_map[m] = Eval::evaluate(pos);
         std::cout << "Evaluation : " <<Eval::evaluate(pos) << std::endl;
         std::cout << pos << std::endl;
         pos.undo_move(m);
 
     }
 
-    for (std::map<Move, Value>::iterator p = x.begin();
-         p != x.end(); ++p ) {
+    for (std::map<Move, Value>::iterator p = v_map.begin();
+         p != v_map.end(); ++p ) {
         sync_cout << " Move : " << UCI::move(p->first,false)
              << ", Value : " << p->second << sync_endl;
     }
 
     sync_cout << sync_endl;
 
-    Move b = get_arg_best_map(x,true);
+    Move b = get_arg_best_map(v_map,true);
     sync_cout << " Best arg : " << UCI::move(b,false) << sync_endl;
+    auto f = v_map.find(b);
+    sync_cout << " Find : " << f->first << f->second << sync_endl;
     return 0;
 }
 
