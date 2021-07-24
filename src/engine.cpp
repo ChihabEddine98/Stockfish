@@ -144,15 +144,10 @@ Move best_action(Position& pos)
 }
 
 // The unbounded minimax iteration which repeats until
-// the depth is exceeded or a terminal position is attained
+//  a terminal position is attained
 
-Value ub_minimax_iter(Position& pos,Depth depth)
+Value ub_minimax_iter(Position& pos)
 {
-    //depth end reached ? or we actually hit a win/lose condition?
-    if (depth == 0)
-    {
-        return  pos.side_to_move() ? Eval::evaluate(pos) : -Eval::evaluate(pos);
-    }
 
     // Get successors (possible actions from the actual Position)
     MoveList<LEGAL> moves = MoveList<LEGAL>(pos);
@@ -186,7 +181,8 @@ Value ub_minimax_iter(Position& pos,Depth depth)
     {
         Move a_b = best_action(pos);
         pos.do_move(a_b,st);
-        v_map[a_b] = ub_minimax_iter(pos,(Depth)depth-1);
+        v_map[a_b] = ub_minimax_iter(pos);
+        //pos.undo_move(a_b);
     }
 
     Move a_b = best_action(pos);
@@ -195,20 +191,29 @@ Value ub_minimax_iter(Position& pos,Depth depth)
 
 }
 
+
+
 // The Unbounded Minimax function that repeat calling
 // unbounded_minimax_iteration while tho (elapsed time is on limits)
 // return the best action to take
-Move ub_minimax(Position& pos,Depth depth ,double tho)
+Move ub_minimax(Position& pos,double tho,int max_iter)
 {
     auto t_start = std::chrono::system_clock::now();
 
-    while(depth > 0)
+
+    for (int i = 0; i < max_iter ; ++i) {
+        cout << " Itération : "<< i << endl;
+        Value value = ub_minimax_iter(pos);
+    }
+
+    /**
+    while(depth > 0 && i )
     {
         auto t_iter = std::chrono::system_clock::now();
         std::chrono::duration<double> delta = t_iter-t_start;
-        if (delta.count() <= tho) break;
+        if (delta.count() < tho) break;
         Value value = ub_minimax_iter(pos,depth);
-    }
+    }**/
 
     return best_action(pos);
 }
@@ -233,7 +238,7 @@ void engine_init(int argc, char* argv[])
 
 void debug()
 {
-    std::string StartFEN = "rnbqkbnN/pppp2pp/8/8/4P3/4KNP1/PP3P1q/8 b q - 1 6";
+    std::string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     Position pos;
     StateInfo st;
 
@@ -242,7 +247,7 @@ void debug()
     pos.set(StartFEN, false,&states->back(),Threads.main());
 
     //AlphaBeta::init(pos,(Depth) 3);
-    Move best_move = search(pos,(Depth) 7);
+    Move best_move = ub_minimax(pos,1000,30);
 
     std::cout << "Turn : " << pos.side_to_move() << std::endl;
     std::cout << "----------------- \n" << std::endl;
@@ -273,13 +278,63 @@ void debug()
 
 }
 
+// This function run a game between
+// Player#1(white) and Player#2(black)
+// Which are passed as strings for ex :
+// A player using UBFMS search approach will be
+// passed as "ubfms" & "alpha-beta" for a
+// Minimax player with alpha-beta pruning
+// A start position is also given as parameter to start a game
+
+
+void play_game(Position& pos,string w_player, string b_player)
+{
+    StateInfo st;
+    MoveList<LEGAL> moves=MoveList<LEGAL>(pos);
+    cout << " Start Position : ---------------------- " << endl;
+    cout << pos << endl;
+
+    Position bkp_pos;
+    StateListPtr states(new std::deque<StateInfo>(1));
+    bkp_pos.set(pos.fen(), false,&states->back(),Threads.main());
+
+    // UBFMS vs AlphaBeta
+    if(w_player == "UBFMS" && b_player == "AlphaBeta")
+    {
+
+        do {
+            moves = MoveList<LEGAL>(bkp_pos);
+
+            Move w_best_move = ub_minimax(pos,1000,30);
+            cout << "#WHITE...UBFMS : " << UCI::move(w_best_move,false) << endl;
+            bkp_pos.do_move(w_best_move,st);
+            cout << bkp_pos << endl;
+
+            Move b_best_move = search(bkp_pos,(Depth) 6);
+            cout << "#BLACK...AlphaBeta : " << UCI::move(b_best_move,false) << endl;
+            bkp_pos.do_move(b_best_move,st);
+            cout << bkp_pos << endl;
+
+        } while (moves.size() > 0);
+
+
+    }
+}
 int main(int argc, char* argv[])
 {
 
     engine_init(argc,argv);
 
-    //debug();
+    string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    Position pos;
+    StateInfo st;
 
+    StateListPtr states(new std::deque<StateInfo>(1));
+
+    pos.set(StartFEN, false,&states->back(),Threads.main());
+    play_game(pos,"UBFMS","AlphaBeta");
+
+    /**
     std::string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     Position pos;
     StateInfo st;
@@ -316,6 +371,7 @@ int main(int argc, char* argv[])
     sync_cout << " Best arg : " << UCI::move(b,false) << sync_endl;
     auto f = v_map.find(b);
     sync_cout << " Find : " << f->first << f->second << sync_endl;
+     **/
     return 0;
 }
 
